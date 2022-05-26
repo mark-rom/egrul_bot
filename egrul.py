@@ -2,11 +2,12 @@ import datetime as dt
 import json
 import logging
 import sys
-from exceptions import EGRULException
 from http import HTTPStatus
 from logging.handlers import RotatingFileHandler
 
 import requests as r
+
+from exceptions import EGRULException
 
 EGRUL_ENDPOINT = "https://egrul.nalog.ru/search-result/"
 REQUEST_URL = "https://egrul.nalog.ru/"
@@ -81,25 +82,44 @@ def chech_expire(company_dict):
         return f'Действует на {date}'
 
 
+def parse_individual(company_dict):
+    name = company_dict["n"].title()
+    inn = company_dict["i"]
+    ogrn = company_dict["o"]
+
+    return (
+        f'ИП: {name}\n'
+        f'ИНН: {inn}\n'
+        f'ОГРНИП: {ogrn}\n'
+    )
+
+
+def parse_company(company_dict):
+    company_name = company_dict["c"]
+    ceo = company_dict["g"].title()
+    inn = company_dict["i"]
+    ogrn = company_dict["o"]
+    kpp = company_dict["p"]
+    address = company_dict["a"].title()
+
+    return (
+        f'Компания: {company_name}\n'
+        f'{ceo}\n'
+        f'ИНН: {inn}\n'
+        f'ОГРН: {ogrn}\n'
+        f'КПП: {kpp}\n'
+        f'Адрес: {address}\n'
+    )
+
+
 def parse_information(company_dict) -> str:
     """Получает словарь с данными компании.
     Возвращает название, ЕИО, ОГРН, ИНН, КПП и адрес компании.
     Либо возвращает имя, ИНН и ОГРНИП индивидуального предпринимателя.
     """
     if company_dict["k"] == "fl":
-        return (
-            f'ИП: {company_dict["n"].title()}\n'
-            f'ИНН: {company_dict["i"]}\n'
-            f'ОГРНИП: {company_dict["o"]}\n'
-        )
-    return (
-        f'Компания: {company_dict["c"]}\n'
-        f'{company_dict["g"].title()}\n'
-        f'ИНН: {company_dict["i"]}\n'
-        f'ОГРН: {company_dict["o"]}\n'
-        f'КПП: {company_dict["p"]}\n'
-        f'Адрес: {company_dict["a"].title()}\n'
-    )
+        return parse_individual(company_dict)
+    return parse_company(company_dict)
 
 
 def parse_egrul(query) -> str:
