@@ -5,7 +5,7 @@ services:
     build: bot/
     restart: always
     environment:
-      - BOT_TOKEN=5188949970:AAEMqX3BDE7tg9CR9coYe_2oKEvOuS4zZfg
+      - BOT_TOKEN=
       - TZ=Europe/Moscow
     ports:
       - 8080:8080
