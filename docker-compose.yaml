@@ -1,0 +1,12 @@
+version: "3"
+
+services:
+  egrul_bot:
+    build: bot/
+    restart: always
+    environment:
+      - BOT_TOKEN=
+      - TZ=Europe/Moscow
+    ports:
+      - 8080:8080
+    
