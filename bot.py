@@ -29,7 +29,7 @@ def send_message(update, context):
 
     if not query.isnumeric():
         text = 'Я умею работать только с ИНН или ОГРН'
-        logger.error(query)
+        logger.error(f'Введена нечисловая строка: {query}')
         context.bot.send_message(chat_id=chat.id, text=text)
         return
 
@@ -40,7 +40,8 @@ def send_message(update, context):
 
 def send_error_message(update, context):
     chat = update.effective.chat
-    text = 'Произошла ошибка, напишите @mark-rom, что вы спросили у бота'
+    text = '''Произошла ошибка. Проверьте, что вводите верный ИНН/ОГРН.
+    Если ИНН/ОГРН введен правильно, сообщите @mark-rom об ошибке.'''
     logger.error(update.message.text)
 
     context.bot.send_message(chat_id=chat.id, text=text)

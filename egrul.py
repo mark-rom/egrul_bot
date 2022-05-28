@@ -3,7 +3,7 @@ import json
 import logging
 import sys
 from http import HTTPStatus
-from logging.handlers import RotatingFileHandler
+from logging import StreamHandler
 
 import requests as r
 
@@ -21,7 +21,7 @@ HEADERS = {
 
 logger = logging.getLogger(__name__)
 formatter = logging.Formatter('%(asctime)s, %(levelname)s, %(message)s')
-handler = RotatingFileHandler(sys.stdout)
+handler = StreamHandler(sys.stdout)
 handler.setFormatter(formatter)
 logger.setLevel(logging.INFO)
 logger.addHandler(handler)
@@ -69,7 +69,13 @@ def get_information(company_token: str):
         msg = 'Список компаний не содержит ключа "rows"'
         logger.error(msg)
         raise EGRULException(msg)
-    return rows_list[0]
+    try:
+        company = rows_list[0]
+    except IndexError:
+        msg = 'Неверный ИНН или ОГРН'
+        logger.error(msg)
+        raise EGRULException(msg)
+    return company
 
 
 def chech_expire(company_dict):
@@ -131,7 +137,7 @@ def parse_egrul(query) -> str:
         expire = chech_expire(company_dict)
         inf = parse_information(company_dict)
     except EGRULException as error:
-        return print(f'Во время работы программы произошла ошибка {error}')
+        return print(f'Во время работы программы произошла ошибка: {error}')
 
     return f'{inf}\n{expire}'
 
