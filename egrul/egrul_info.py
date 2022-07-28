@@ -1,13 +1,16 @@
 import datetime as dt
 import json
 import logging
-import sys
-from exceptions import EGRULException
+import os
 from http import HTTPStatus
-from logging import StreamHandler
+from logging.handlers import RotatingFileHandler
 from typing import Callable, Dict
 
 import requests as r
+
+from settings import LOGS_DIR
+
+from .exceptions import EGRULException
 
 FTS_URL = 'https://egrul.nalog.ru/'
 SEARCH_ENDPOINT = 'search-result/'
@@ -21,7 +24,10 @@ HEADERS = {
 
 logger = logging.getLogger(__name__)
 formatter = logging.Formatter('%(asctime)s, %(levelname)s, %(message)s')
-handler = StreamHandler(sys.stdout)
+handler = RotatingFileHandler(
+    os.path.join(LOGS_DIR, 'egrul_info/egrul_info.log'), backupCount=1,
+    encoding='utf-8', maxBytes=1000000
+)
 handler.setFormatter(formatter)
 logger.setLevel(logging.INFO)
 logger.addHandler(handler)
@@ -47,6 +53,8 @@ def get_companys_token(query: int) -> Dict:
         msg = f'Сайт "{FTS_URL}" недоступен, код: {response.status_code}'
         raise EGRULException(msg)
 
+    logger.info('Успешный запрос токена')
+
     return response.json()
 
 
@@ -60,6 +68,8 @@ def get_company_data(company_token: str) -> Dict:
         msg = f'Невозможно отправить запрос на {url}'
         raise EGRULException(msg)
 
+    logger.info('Успешный запрос данных компании')
+
     try:
         rows_list = response.json()["rows"]
     except KeyError:
@@ -71,6 +81,8 @@ def get_company_data(company_token: str) -> Dict:
     except IndexError:
         msg = 'По этому ИНН/ОГРН ничего не нашлось. Проверьте написание.'
         raise EGRULException(msg)
+
+    logger.info('Ответ содержит данные о компании')
 
     return company
 
@@ -129,8 +141,8 @@ def parse_company(company_dict: Dict) -> str:
 
 
 def parse_information(company_dict: Dict) -> Callable[[Dict], str]:
-    """Получает словарь с данными компании."""
-    # не придумал докстринг на русском
+    """Получает словарь с данными компании.
+    Возвращает функцию, обрабатывающую данные об ИП или ЮЛ."""
     if company_dict["k"] == "fl":
         return parse_individual(company_dict)
     return parse_company(company_dict)
@@ -149,7 +161,7 @@ def parse_egrul(query: int) -> str:
         raise Exception(f'При поиске произошла ошибка.\n{error}')
 
     except Exception as e:
-        logger.error(e)
+        logger.exception(e)
         raise Exception(f'Во время работы программы произошла ошибка.\n{e}')
 
     return f'{inf}\n{expire}'

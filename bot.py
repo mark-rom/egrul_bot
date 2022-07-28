@@ -1,12 +1,12 @@
 import logging
 import os
 import sys
-from asyncio.log import logger
 
 from dotenv import load_dotenv
-from telegram.ext import CommandHandler, Filters, MessageHandler, Updater
+from telegram.ext import (CommandHandler, ConversationHandler, Filters,
+                          MessageHandler, Updater)
 
-from egrul import parse_egrul
+from egrul import egrul_extraction, egrul_info
 
 load_dotenv()
 
@@ -21,6 +21,7 @@ log.addHandler(handler)
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(BASE_DIR, 'static/')
+EXTRACTION = range(1)
 
 
 def send_message(update, context):
@@ -29,29 +30,60 @@ def send_message(update, context):
 
     if not query.isnumeric():
         text = 'Я умею работать только с ИНН или ОГРН'
-        logger.error(f'Введена нечисловая строка: {query}')
+        log.error(f'Введена нечисловая строка: {query}')
         context.bot.send_message(chat_id=chat.id, text=text)
         return
 
-    text = parse_egrul(query)
+    text = egrul_info.parse_egrul(query)
 
     context.bot.send_message(chat_id=chat.id, text=text)
+
+
+def new_extraction(update, context):
+    text = 'Пожалуйста, пришлите ИНН или ОГРН или отмените командой /cancel'
+    update.message.reply_text(text)
+    return EXTRACTION
+
+
+def send_extraction(update, context):
+    chat = update.effective_chat
+    query = update.message.text
+
+    if not query.isnumeric():
+        text = 'Я умею работать только с ИНН или ОГРН'
+        log.error(f'Введена нечисловая строка: {query}')
+        context.bot.send_message(chat_id=chat.id, text=text)
+
+    # else:
+    extraction = egrul_extraction.get_extraction(query)
+
+    context.bot.send_document(
+        chat_id=chat.id,
+        document=extraction,
+    )
+    return ConversationHandler.END
 
 
 def send_error_message(update, context):
-    chat = update.effective.chat
-    text = '''Произошла ошибка. Проверьте, что вводите верный ИНН/ОГРН.
-    Если ИНН/ОГРН введен правильно, сообщите @mark-rom об ошибке.'''
-    logger.error(update.message.text)
+    chat = update.effective_chat
+    log.exception(update.message.text, context.error)
+    text = 'В работе бота произошла ошибка, попробуйте повторить запрос позже.'
 
     context.bot.send_message(chat_id=chat.id, text=text)
+
+
+def get_static(path):
+
+    file = open(path)
+    text = file.read()
+    file.close()
+
+    return text
 
 
 def start(update, context):
     file_path = os.path.join(STATIC, 'start.txt')
-    start_file = open(file_path)
-    text = start_file.read()
-    start_file.close()
+    text = get_static(file_path)
 
     chat = update.effective_chat
     context.bot.send_message(chat_id=chat.id, text=text)
@@ -59,9 +91,7 @@ def start(update, context):
 
 def about(update, context):
     file_path = os.path.join(STATIC, 'about_author.txt')
-    start_file = open(file_path)
-    text = start_file.read()
-    start_file.close()
+    text = get_static(file_path)
 
     chat = update.effective_chat
     context.bot.send_message(chat_id=chat.id, text=text)
@@ -69,9 +99,7 @@ def about(update, context):
 
 def help(update, context):
     file_path = os.path.join(STATIC, 'help.txt')
-    start_file = open(file_path)
-    text = start_file.read()
-    start_file.close()
+    text = get_static(file_path)
 
     chat = update.effective_chat
     context.bot.send_message(chat_id=chat.id, text=text)
@@ -79,9 +107,22 @@ def help(update, context):
 
 def support(update, context):
     file_path = os.path.join(STATIC, 'support.txt')
-    start_file = open(file_path)
-    text = start_file.read()
-    start_file.close()
+    text = get_static(file_path)
+
+    chat = update.effective_chat
+    context.bot.send_message(chat_id=chat.id, text=text)
+
+
+def cancel(update, context):
+    chat = update.effective_chat
+    text = 'Вы всегда можете запросить выписку по команде /get_extraction'
+    context.bot.send_message(chat_id=chat.id, text=text)
+    return ConversationHandler.END
+
+
+def commands(update, context):
+    file_path = os.path.join(STATIC, 'commands.txt')
+    text = get_static(file_path)
 
     chat = update.effective_chat
     context.bot.send_message(chat_id=chat.id, text=text)
@@ -101,8 +142,23 @@ start_handler = CommandHandler('start', start)
 help_handler = CommandHandler('help', help)
 support_handler = CommandHandler('support', support)
 about_handler = CommandHandler('about', about)
-parse_egrul_handler = MessageHandler(Filters.text, send_message)
-error_message_handler = MessageHandler(Filters.text, send_error_message)
+cancel_handler = CommandHandler('cancel', cancel)
+cancel_handler = CommandHandler('commands', commands)
+
+parse_egrul_handler = MessageHandler(
+    Filters.text & (~ Filters.command),
+    send_message
+)
+extraction_handler = MessageHandler(
+    Filters.text & (~ Filters.command),
+    send_extraction
+)
+
+get_extraction_conv = ConversationHandler(
+    entry_points=[CommandHandler('get_extraction', new_extraction)],
+    states={EXTRACTION: [extraction_handler]},
+    fallbacks=[cancel_handler]
+)
 
 
 def main():
@@ -111,20 +167,18 @@ def main():
 
     updater = Updater(token=BOT_TOKEN)
 
-    while True:
-        try:
-            updater.start_polling()
-            updater.dispatcher.add_handler(start_handler)
-            updater.dispatcher.add_handler(help_handler)
-            updater.dispatcher.add_handler(support_handler)
-            updater.dispatcher.add_handler(about_handler)
+    updater.start_polling()
+    updater.dispatcher.add_handler(start_handler)
+    updater.dispatcher.add_handler(help_handler)
+    updater.dispatcher.add_handler(support_handler)
+    updater.dispatcher.add_handler(about_handler)
 
-            updater.dispatcher.add_handler(parse_egrul_handler)
-        except Exception as e:
-            logger.exception(e)
-            updater.dispatcher.add_handler(error_message_handler)
-        finally:
-            updater.idle()
+    updater.dispatcher.add_handler(get_extraction_conv)
+    updater.dispatcher.add_handler(parse_egrul_handler)
+
+    updater.dispatcher.add_error_handler(send_error_message)
+
+    updater.idle()
 
 
 if __name__ == '__main__':
