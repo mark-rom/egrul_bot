@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:13.0-alpine
+    volumes:
+      - egrul_bot_db:/var/lib/postgresql/data/
+    env_file:
+      - ./.env
+    networks:
+      - egrul_bot
+
+  bot:
+    build: ../
+    volumes:
+      - bot_logs:/app/logs/
+    depends_on:
+      - db
+    env_file:
+      - ./.env
+    networks:
+      - egrul_bot
+
+volumes:
+  bot_logs:
+  egrul_bot_db:
+
+networks:
+  egrul_bot:

@@ -1,5 +1,14 @@
 import os
+from pathlib import Path
 
-BASE_DIR = os.path.dirname(__file__)
+from dotenv import load_dotenv
 
-LOGS_DIR = os.path.join(BASE_DIR, 'logs/')
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / 'static'
+LOGS_DIR = BASE_DIR / 'logs'
+
+
+env_path = BASE_DIR / 'infra/.env'
+load_dotenv(env_path)
+
+BOT_TOKEN = os.getenv('BOT_TOKEN')

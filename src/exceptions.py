@@ -5,3 +5,11 @@ class EGRULException(Exception):
 
     def __str__(self) -> str:
         return self.message
+
+
+class UserEGRULException(EGRULException):
+    ...
+
+
+class DevEGRULException(EGRULException):
+    ...
